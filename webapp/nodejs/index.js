@@ -108,31 +108,37 @@ function getIndex(req, res) {
   }
 }
 
-function getChannelListInfo (conn, focusChannelId = null) {
+function getChannelList (conn) {
   return conn.query('SELECT * FROM channel ORDER BY id')
     .then(channels => {
-      let description = ''
-      channels.forEach((channel) => {
-        if (channel.id == focusChannelId) {
-          description = channel.description
-        }
-      })
-
-      return { channels, description }
+      return { channels }
     })
+}
+
+function getChannelById (conn, focusChannelId = null) {
+  if (focusChannelId === null) {
+    return { channel: {} }
+  }
+  return conn.query('SELECT * FROM channel WHERE id = ?', [focusChannelId]).then(channels => {
+    return { channel: channels[0] }
+  })
 }
 
 app.get('/channel/:channelId', loginRequired, getChannel)
 function getChannel(req, res) {
   const { channelId } = req.params
-  return getChannelListInfo(pool, channelId)
-    .then(({ channels, description }) => {
-      res.render('channel', {
-        req,
-        channels,
-        description,
-        channelId,
-      })
+  return getChannelList(pool, channelId)
+    .then(({ channels }) => {
+      getChannelById(pool, channelId)
+        .then(({ channel }) => {
+          const description = Object.keys(channel).length === 0 ? '' : channel.description
+          res.render('channel', {
+            req,
+            channels,
+            description,
+            channelId,
+          })
+        })
     })
 }
 
@@ -340,8 +346,8 @@ function getHistory(req, res) {
 
           return p.then(() => {
             messages.reverse()
-            return getChannelListInfo(pool, channelId)
-              .then(({ channels, description }) => {
+            return getChannelList(pool, channelId)
+              .then(({ channels }) => {
                 res.render('history', {
                   req, channels, channelId, messages, maxPage, page,
                 })
@@ -354,7 +360,7 @@ function getHistory(req, res) {
 app.get('/profile/:userName', loginRequired, getProfile)
 function getProfile(req, res) {
   const { userName } = req.params
-  return getChannelListInfo(pool)
+  return getChannelList(pool)
     .then(({ channels }) => {
       return pool.query('SELECT * FROM user WHERE name = ?', [userName])
         .then(([user]) => {
@@ -371,7 +377,7 @@ function getProfile(req, res) {
 
 app.get('/add_channel', loginRequired, getAddChannel)
 function getAddChannel(req, res) {
-  return getChannelListInfo(pool)
+  return getChannelList(pool)
     .then(({ channels }) => {
       res.render('add_channel', { req, channels })
     })
