@@ -108,38 +108,31 @@ function getIndex(req, res) {
   }
 }
 
-function getChannelList (conn) {
-  return conn.query('SELECT * FROM channel ORDER BY id')
-    .then(channels => {
-      return { channels }
-    })
+async function getChannelList (conn) {
+  const channels = await conn.query('SELECT * FROM channel ORDER BY id')
+  return channels
 }
 
-function getChannelById (conn, focusChannelId = null) {
+async function getChannelById (conn, focusChannelId = null) {
   if (focusChannelId === null) {
-    return { channel: {} }
+    return {}
   }
-  return conn.query('SELECT * FROM channel WHERE id = ?', [focusChannelId]).then(channels => {
-    return { channel: channels[0] }
-  })
+  const [channel] = await conn.query('SELECT * FROM channel WHERE id = ?', [focusChannelId])
+  return channel
 }
 
 app.get('/channel/:channelId', loginRequired, getChannel)
-function getChannel(req, res) {
+async function getChannel(req, res) {
   const { channelId } = req.params
-  return getChannelList(pool, channelId)
-    .then(({ channels }) => {
-      getChannelById(pool, channelId)
-        .then(({ channel }) => {
-          const description = Object.keys(channel).length === 0 ? '' : channel.description
-          res.render('channel', {
-            req,
-            channels,
-            description,
-            channelId,
-          })
-        })
-    })
+  const channels = await getChannelList(pool, channelId)
+  const channel = await getChannelById(pool, channelId)
+  const description = Object.keys(channel).length === 0 ? '' : channel.description
+  res.render('channel', {
+    req,
+    channels,
+    description,
+    channelId,
+  })
 }
 
 app.get('/register', getRegister)
@@ -344,43 +337,34 @@ function getHistory(req, res) {
             })
           })
 
-          return p.then(() => {
+          return p.then(async () => {
             messages.reverse()
-            return getChannelList(pool, channelId)
-              .then(({ channels }) => {
-                res.render('history', {
-                  req, channels, channelId, messages, maxPage, page,
-                })
-              })
+            const channels = await getChannelList(pool)
+            res.render('history', {
+              req, channels, channelId, messages, maxPage, page,
+            })
           })
       })
     })
 }
 
 app.get('/profile/:userName', loginRequired, getProfile)
-function getProfile(req, res) {
+async function getProfile(req, res) {
   const { userName } = req.params
-  return getChannelList(pool)
-    .then(({ channels }) => {
-      return pool.query('SELECT * FROM user WHERE name = ?', [userName])
-        .then(([user]) => {
-          if (!user) {
-            res.status(404).end()
-            return
-          }
-
-          const selfProfile = req.user.id == user.id
-          return res.render('profile', { req, channels, user, selfProfile })
-        })
-    })
+  const channels = await getChannelList(pool)
+  const [user] = await pool.query('SELECT * FROM user WHERE name = ?', [userName])
+  if (!user) {
+    res.status(404).end()
+    return
+  }
+  const selfProfile = req.user.id == user.id
+  return res.render('profile', { req, channels, user, selfProfile })
 }
 
 app.get('/add_channel', loginRequired, getAddChannel)
-function getAddChannel(req, res) {
-  return getChannelList(pool)
-    .then(({ channels }) => {
-      res.render('add_channel', { req, channels })
-    })
+async function getAddChannel(req, res) {
+  const channels = await getChannelList(pool)
+  res.render('add_channel', { req, channels })
 }
 
 app.post('/add_channel', loginRequired, postAddChannel)
