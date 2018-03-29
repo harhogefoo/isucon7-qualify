@@ -2,7 +2,11 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const express = require('express')
-const session = require('cookie-session')
+// const session = require('cookie-session')
+const session = require('express-session');
+const RedisStore = require('connect-redis')(session);
+
+
 const bodyParser = require('body-parser')
 const multer = require('multer')
 const mysql = require('mysql')
@@ -25,10 +29,19 @@ app.set('view engine', 'html')
 app.engine('html', ect.render)
 app.use(express.static(STATIC_FOLDER))
 app.use(bodyParser.urlencoded({ extended: true }))
+// app.use(session({
+//   name: 'session',
+//   keys: ['tonymoris'],
+//   maxAge: 360000,
+// }))
+
 app.use(session({
-  name: 'session',
-  keys: ['tonymoris'],
-  maxAge: 360000,
+  store: new RedisStore({
+    host: 'localhost',
+    port: 6379,
+  }),
+  secret: 'keyboard cat',
+  resave: false
 }))
 app.use((err, req, res, next) => {
   res.status(500).end()
